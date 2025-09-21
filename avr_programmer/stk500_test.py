@@ -5,7 +5,7 @@ import time
 # ----------------------------
 # Configuration
 # ----------------------------
-PORT = '/dev/cu.usbserial-0001'  # change to your port
+PORT = '/dev/cu.usbserial-0001'
 BAUD = 115200
 TIMEOUT = 2  # seconds
 
