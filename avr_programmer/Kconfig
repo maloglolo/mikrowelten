@@ -1,0 +1,7 @@
+menu "AVR Programmer Configuration"
+
+source "hal/Kconfig"
+source "protocols/Kconfig"
+source "programmer/Kconfig"
+
+endmenu

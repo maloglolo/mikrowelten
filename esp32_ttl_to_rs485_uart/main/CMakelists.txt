@@ -1,0 +1,2 @@
+idf_component_register(SRCS "master.c" "receiver.c" "role_select.h"
+                    INCLUDE_DIRS ".")

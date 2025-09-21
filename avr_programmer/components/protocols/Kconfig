@@ -1,0 +1,15 @@
+menu "Protocol Options"
+
+config AVR_PROTOCOL_STK500V1
+    bool "Enable STK500v1"
+    default y
+    help
+      Include STK500v1 protocol support
+
+config AVR_PROTOCOL_STK500V2
+    bool "Enable STK500v2"
+    default n
+    help
+      Include STK500v2 protocol support (not implemented yet)
+
+endmenu

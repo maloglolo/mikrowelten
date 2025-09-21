@@ -1,0 +1,6 @@
+
+CompileFlags:
+  Add: 
+    - --header-insertion=never
+    - --function-arg-placeholders=false
+    - --inlay-hints=false

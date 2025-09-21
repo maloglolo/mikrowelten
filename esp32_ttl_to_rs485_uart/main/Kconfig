@@ -1,0 +1,41 @@
+
+menu "RS485 UART Configuration"
+
+config RS485_UART_PORT
+    int "UART Port Number"
+    default 1
+    range 0 2
+    help "UART port used for RS485"
+
+config RS485_UART_TX
+    int "UART TX Pin"
+    default 17
+    help "TX pin for RS485 UART"
+
+config RS485_UART_RX
+    int "UART RX Pin"
+    default 16
+    help "RX pin for RS485 UART"
+
+config RS485_UART_DE
+    int "UART RTS / DE Pin"
+    default 18
+    help "Direction control pin for RS485"
+
+config RS485_UART_RE
+    int "UART RTS / RE Pin"
+    default 19
+    help "Receiver enable pin for RS485 if separate from DE"
+
+config RS485_BAUD_RATE
+    int "UART Baud Rate"
+    default 115200
+    help "Baud rate for RS485 communication"
+
+config SLAVE_ADDRESS
+    int "Slave Address"
+    default 1
+    range 1 255
+    help "Unique address of the RS485 slave"
+
+endmenu

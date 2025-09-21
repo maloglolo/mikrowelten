@@ -1,0 +1,15 @@
+menu "Programmer Options"
+
+config AVR_PROGRAMMER_RX_BUFFER_SIZE
+    int "RX Buffer Size"
+    default 256
+    help
+      Size of the serial receive buffer
+
+config AVR_PROGRAMMER_TX_BUFFER_SIZE
+    int "TX Buffer Size"
+    default 256
+    help
+      Size of the serial transmit buffer
+
+endmenu
