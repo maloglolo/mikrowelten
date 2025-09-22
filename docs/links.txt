@@ -1,0 +1,2 @@
+https://www.circuitstate.com/tutorials/what-is-rs-485-how-to-use-max485-with-arduino-for-reliable-long-distance-serial-communication
+https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
