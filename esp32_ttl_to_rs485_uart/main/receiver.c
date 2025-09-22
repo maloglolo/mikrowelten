@@ -3,14 +3,12 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
-#include "esp_timer.h"
 #include "esp_adc/adc_oneshot.h"
 
 #define TAG "RS485_SLAVE"
@@ -19,13 +17,13 @@
 #define CMD_PING 0x01
 #define CMD_PONG 0x02
 
-#define UART_PORT       ((uart_port_t)CONFIG_RS485_UART_PORT)
-#define UART_TX_PIN     CONFIG_RS485_UART_TX
-#define UART_RX_PIN     CONFIG_RS485_UART_RX
-#define UART_DE_PIN     CONFIG_RS485_UART_DE
-#define UART_RE_PIN     CONFIG_RS485_UART_RE
-#define BAUD_RATE       CONFIG_RS485_BAUD_RATE
-#define MY_ADDR         CONFIG_SLAVE_ADDRESS
+#define UART_PORT   ((uart_port_t)CONFIG_RS485_UART_PORT)
+#define UART_TX_PIN CONFIG_RS485_UART_TX
+#define UART_RX_PIN CONFIG_RS485_UART_RX
+#define UART_DE_PIN CONFIG_RS485_UART_DE
+#define UART_RE_PIN CONFIG_RS485_UART_RE
+#define BAUD_RATE   CONFIG_RS485_BAUD_RATE
+#define MY_ADDR     CONFIG_SLAVE_ADDRESS
 
 static uint8_t checksum(const uint8_t *b, size_t len) {
     uint8_t s = 0;
@@ -44,32 +42,25 @@ static void build_frame(uint8_t *out, uint8_t addr, uint8_t cmd,
     *out_len = 5 + len;
 }
 
-// --------------------- Updated Temperature Reading ---------------------
-float read_temperature(adc_oneshot_unit_handle_t adc_handle) {
+// ---------------- Soil Moisture Reading ----------------
+float read_soil_moisture(adc_oneshot_unit_handle_t adc_handle) {
     int raw = 0;
-    adc_oneshot_read(adc_handle, ADC_CHANNEL_6, &raw);
-    float v = (3.3f * raw) / 4095.0f;
-    ESP_LOGI(TAG, "ADC raw=%d, V=%.3f", raw, v);
+    ESP_ERROR_CHECK(adc_oneshot_read(adc_handle, ADC_CHANNEL_6, &raw));
+    ESP_LOGI(TAG, "ADC raw=%d", raw);
 
-    if (v <= 0.01f) return -273.0f; // prevent log(0)
 
-    // Voltage divider
-    float R_fixed = 100000.0f;
-    float R_ntc = (v * R_fixed) / (3.3f - v);
+    const int raw_dry = 3000;   // dry air/soil
+    const int raw_wet = 1000;   // fully wet soil / water
 
-    // Beta formula
-    float B = 3950.0f;
-    float R0 = 47000.0f;
-    float T0 = 298.15f;
+    float percent = (float)(raw_dry - raw) / (raw_dry - raw_wet) * 100.0f;
 
-    float inv_T = (1.0f / T0) + (1.0f / B) * logf(R_ntc / R0);
-    float T = 1.0f / inv_T;
+    if (percent < 0) percent = 0;
+    if (percent > 100) percent = 100;
 
-    return T - 273.15f; // Celsius
+    return percent;
 }
 
-void app_main(void)
-{
+void app_main(void) {
     ESP_LOGI(TAG, "Slave starting, addr=%d", MY_ADDR);
 
     // ---------------- UART Setup ----------------
@@ -100,23 +91,17 @@ void app_main(void)
     ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_cfg, &adc_handle));
 
     adc_oneshot_chan_cfg_t chan_cfg = {
-        .atten = ADC_ATTEN_DB_12, // replaces deprecated DB_11
+        .atten = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_DEFAULT
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, ADC_CHANNEL_6, &chan_cfg));
 
-    // ---------------- Buffers ----------------
     uint8_t rxbuf[BUF_SIZE];
     uint8_t txbuf[BUF_SIZE];
 
-    // ---------------- Main Loop ----------------
-    while(1) {
+    while (1) {
         int len = uart_read_bytes(UART_PORT, rxbuf, sizeof(rxbuf), 100 / portTICK_PERIOD_MS);
         if (len < 5) { vTaskDelay(pdMS_TO_TICKS(10)); continue; }
-
-        if (len > 0) ESP_LOGI(TAG, "Received %d bytes: %02X %02X %02X ...", len, rxbuf[0], rxbuf[1], rxbuf[2]);
-
-        vTaskDelay(pdMS_TO_TICKS(50));
 
         int start_idx = -1;
         for (int i = 0; i < len; ++i) if (rxbuf[i] == START_BYTE) { start_idx = i; break; }
@@ -130,31 +115,23 @@ void app_main(void)
         if (frame[4 + dlen] != checksum(&frame[1], 3 + dlen)) continue;
 
         if (addr == MY_ADDR && cmd == CMD_PING) {
-            float tempC = read_temperature(adc_handle);
-            int16_t temp_i16 = (int16_t)(tempC * 100);
+            float moisture = read_soil_moisture(adc_handle);
 
-            uint8_t payload[4] = {
-                MY_ADDR,
-                (uint8_t)(temp_i16 & 0xFF),
-                (uint8_t)((temp_i16 >> 8) & 0xFF),
-                0
+            uint8_t payload[1] = {
+                (uint8_t)(moisture + 0.5f)  // round to nearest integer
             };
 
             int txlen = 0;
             build_frame(txbuf, MY_ADDR, CMD_PONG, payload, sizeof(payload), &txlen);
 
-            // Transmit
             gpio_set_level(UART_DE_PIN, 1);
             gpio_set_level(UART_RE_PIN, 1);
-
             uart_write_bytes(UART_PORT, (const char*)txbuf, txlen);
             ESP_ERROR_CHECK(uart_wait_tx_done(UART_PORT, 50 / portTICK_PERIOD_MS));
-
-            // Back to receive
             gpio_set_level(UART_DE_PIN, 0);
             gpio_set_level(UART_RE_PIN, 0);
 
-            ESP_LOGI(TAG, "Replied PONG with temperature %.2f°C", tempC);
+            ESP_LOGI(TAG, "Replied PONG with moisture %.1f %%", moisture);
         }
     }
 }

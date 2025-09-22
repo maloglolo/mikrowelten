@@ -1,175 +1,65 @@
-#include "stk500.h"
-#include "programmer.h"
-#include "ringbuffer.h"
-
 #include "driver/uart.h"
+#include "esp_log.h"
 #include <string.h>
 
-#define RX_RING_SIZE 512
-#define FRAME_MAX_SIZE 260
+#define UART_NUM        UART_NUM_0
+#define BUF_SIZE        256
 
-#define STK_START 0x1B
-#define STK_END   0x20
+#define STK_START       0x1B
+#define STK_INSYNC      0x14
+#define STK_OK          0x10
+#define STK_CRC_EOP     0x20
+#define STK_GET_SYNC    0x30
+#define STK_GET_SIGN_ON 0x31
 
-#define STK_OK      0x10
-#define STK_FAILED  0x11
-#define STK_INSYNC  0x14
+static const char *TAG = "STK500_TEST";
 
-#define STK_GET_SYNC       0x30
-#define STK_GET_SIGN_ON    0x31
-#define STK_ENTER_PROGMODE 0x50
-#define STK_LEAVE_PROGMODE 0x51
-#define STK_LOAD_ADDRESS   0x55
-#define STK_PROG_PAGE      0x64
-#define STK_READ_PAGE      0x74
-
-static ring_buffer_t rx_ring;
-static uint8_t rx_buffer[RX_RING_SIZE];
-static uint16_t current_address = 0;
-
-// ----------------------------
-// UART helpers
-// ----------------------------
-static void send_status(uint8_t ok) {
-    uint8_t msg[2] = { STK_INSYNC, ok ? STK_OK : STK_FAILED };
-    uart_write_bytes(UART_NUM_0, (const char*)msg, sizeof(msg));
+static void reply_ok(void) {
+    uint8_t resp[2] = {STK_INSYNC, STK_OK};
+    uart_write_bytes(UART_NUM, (const char*)resp, 2);
 }
 
-static void send_bytes(const uint8_t *data, size_t len) {
-    uart_write_bytes(UART_NUM_0, (const char*)data, len);
+static void reply_sign_on(void) {
+    const char msg[] = "AVR ISP";
+    uint8_t resp[sizeof(msg) + 2];
+    resp[0] = STK_INSYNC;
+    memcpy(&resp[1], msg, sizeof(msg)-1);
+    resp[sizeof(msg)] = STK_OK;
+    uart_write_bytes(UART_NUM, (const char*)resp, sizeof(resp));
 }
 
-// ----------------------------
-// Frame handling
-// ----------------------------
-static void handle_frame(const uint8_t *frame, size_t len) {
-    if(len < 4) {
-        send_status(0); // too short to be valid
-        return;
-    }
+void app_main(void) {
+    uart_config_t uart_config = {
+        .baud_rate = 57600,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+    };
 
-    uint8_t cmd = frame[0];
-    uint16_t payload_len = ((uint16_t)frame[1] << 8) | frame[2];
-    size_t expected_len = 1 /*cmd*/ + 2 /*lenH+lenL*/ + payload_len + 1 /*checksum*/;
-    if(len != expected_len) {
-        send_status(0); // length mismatch
-        return;
-    }
+    uart_param_config(UART_NUM, &uart_config);
+    uart_driver_install(UART_NUM, BUF_SIZE, 0, 0, NULL, 0);
 
-    // Checksum: XOR of CMD + LEN_H + LEN_L + PAYLOAD
-    uint8_t expected_csum = frame[len-1];
-    uint8_t actual_csum = 0;
-    for(size_t i = 0; i < len-1; i++) actual_csum ^= frame[i];
-    if(expected_csum != actual_csum) {
-        send_status(0); // bad checksum
-        return;
-    }
+    ESP_LOGI(TAG, "STK500 test server running");
 
-    const uint8_t *payload = payload_len ? &frame[3] : NULL;
+    uint8_t buf[1];
+    while (1) {
+        int len = uart_read_bytes(UART_NUM, buf, 1, 100 / portTICK_PERIOD_MS);
+        if (len > 0) {
+            ESP_LOGI(TAG, "RX: 0x%02X", buf[0]);
 
-    switch(cmd) {
-        case STK_GET_SYNC:
-            send_status(1);
-            break;
-
-        case STK_GET_SIGN_ON: {
-            uint8_t resp[] = { STK_INSYNC, 'A', 'V', 'R', STK_OK };
-            send_bytes(resp, sizeof(resp));
-            break;
-        }
-
-        case STK_ENTER_PROGMODE:
-            programmer_enter();
-            send_status(1);
-            break;
-
-        case STK_LEAVE_PROGMODE:
-            programmer_leave();
-            send_status(1);
-            break;
-
-        case STK_LOAD_ADDRESS:
-            if(payload_len == 2) {
-                current_address = (payload[0] << 8) | payload[1];
-                send_status(1);
-            } else {
-                send_status(0);
+            if (buf[0] == STK_START) {
+                int cmd = uart_read_bytes(UART_NUM, buf, 1, 10 / portTICK_PERIOD_MS);
+                if (cmd > 0) {
+                    switch(buf[0]) {
+                        case STK_GET_SYNC: reply_ok(); break;
+                        case STK_GET_SIGN_ON: reply_sign_on(); break;
+                        default: reply_ok(); break;
+                    }
+                    // consume CRC_EOP
+                    uart_read_bytes(UART_NUM, buf, 1, 10 / portTICK_PERIOD_MS);
+                }
             }
-            break;
-
-        case STK_PROG_PAGE:
-            if(payload_len > 0 && payload) {
-                programmer_prog_page(current_address, payload, payload_len);
-                current_address += payload_len / 2; // increment by words
-                send_status(1);
-            } else {
-                send_status(0);
-            }
-            break;
-
-        case STK_READ_PAGE:
-            if(payload_len > 0 && payload) {
-                programmer_read_page(current_address, payload, payload_len);
-                current_address += payload_len / 2;
-                uint8_t resp[2 + payload_len + 1];
-                resp[0] = STK_INSYNC;
-                memcpy(&resp[1], payload, payload_len);
-                resp[1 + payload_len] = STK_OK;
-                send_bytes(resp, sizeof(resp));
-            } else {
-                send_status(0);
-            }
-            break;
-
-        default:
-            send_status(0); // unknown command
-            break;
-    }
-}
-
-// ----------------------------
-// Ring buffer processing
-// ----------------------------
-static void process_ring(void) {
-    static uint8_t frame[FRAME_MAX_SIZE];
-    static size_t frame_len = 0;
-
-    while(!ring_buffer_empty(&rx_ring)) {
-        uint8_t b;
-        ring_buffer_pop(&rx_ring, &b);
-
-        if(frame_len == 0 && b != STK_START) continue;
-
-        frame[frame_len++] = b;
-
-        if(b == STK_END) {
-            // Exclude STK_START and STK_END
-            if(frame_len >= 2) handle_frame(&frame[1], frame_len - 2);
-            frame_len = 0;
-        } else if(frame_len >= FRAME_MAX_SIZE) {
-            frame_len = 0; // reset on overflow
         }
     }
-}
-
-// ----------------------------
-// Public API
-// ----------------------------
-void stk500_init(void) {
-    ring_buffer_init(&rx_ring, rx_buffer, RX_RING_SIZE);
-    current_address = 0;
-}
-
-void stk500_reset(void) {
-    current_address = 0;
-    ring_buffer_init(&rx_ring, rx_buffer, RX_RING_SIZE);
-}
-
-void stk500_on_byte(uint8_t byte) {
-    if(!ring_buffer_push(&rx_ring, byte)) {
-        uint8_t discard;
-        ring_buffer_pop(&rx_ring, &discard);
-        ring_buffer_push(&rx_ring, byte);
-    }
-    process_ring();
 }

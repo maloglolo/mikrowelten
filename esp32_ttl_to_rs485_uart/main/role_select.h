@@ -1,7 +1,7 @@
 #pragma once
 
-//#define ROLE_MASTER
-#define ROLE_RECEIVER
+#define ROLE_MASTER
+//#define ROLE_RECEIVER
 
 #ifdef ROLE_MASTER
 #define IS_MASTER 1
