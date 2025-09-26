@@ -1,0 +1,11 @@
+menu "Rotary Encoder Configuration"
+
+config ROTARY_PIN_CLK
+    int "Rotary CLK Pin"
+    default 22
+
+config ROTARY_PIN_DT
+    int "Rotary DT Pin"
+    default 19
+
+endmenu

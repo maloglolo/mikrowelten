@@ -1,0 +1,23 @@
+menu "Display Configuration"
+
+config DISPLAY_PIN_CLK
+    int "SPI CLK Pin"
+    default 18
+
+config DISPLAY_PIN_MOSI
+    int "SPI MOSI Pin"
+    default 23
+
+config DISPLAY_PIN_CS
+    int "SPI CS Pin"
+    default 5
+
+config DISPLAY_PIN_DC
+    int "SPI DC Pin"
+    default 16
+
+config DISPLAY_PIN_RST
+    int "SPI RST Pin"
+    default 17
+
+endmenu

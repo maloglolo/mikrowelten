@@ -1,0 +1,11 @@
+menu "Button ADC Configuration"
+
+config BUTTON_ADC_PIN
+    int "ADC GPIO for Buttons"
+    default 4
+
+config BUTTON_DEBOUNCE_MS
+    int "Debounce Time (ms)"
+    default 50
+
+endmenu
