@@ -35,8 +35,8 @@
  *   - Gray code & quadrature encoders:
  *       https://en.wikipedia.org/wiki/Quadrature_encoder
  *   - Examples and discussions:
- *       https://esp32.com/viewtopic.php?t=13334
  *       https://www.buxtronix.net/2011/10/rotary-encoders-done-properly.html
+ *        - http://web.archive.org/web/20250614170824/https://www.buxtronix.net/2011/10/rotary-encoders-done-properly.html
  *       https://www.best-microcontroller-projects.com/rotary-encoder.html
  *   - General encoder theory:
  *       https://www.pjrc.com/teensy/td_libs_Encoder.html
@@ -97,7 +97,6 @@ void IRAM_ATTR rotary_isr(void *arg) {
 
     last_state = current_state;
 }
-
 
 void rotary_init(void) {
     gpio_config_t io_conf = {

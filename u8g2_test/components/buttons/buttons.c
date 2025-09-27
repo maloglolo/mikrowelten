@@ -33,8 +33,7 @@
  *
  * Resources:
  *   - Bitmasking basics:
- * https://embeddedartistry.com/blog/2018/07/12/bit-masks-in-c-and-cpp/
- *   - Efficient button handling: https://www.microchip.com/forums/m1053435.aspx
+ * https://www.clivemaxfield.com/coolbeans/masking-and-the-c-c-bitwise-operators/
  *   - FreeRTOS task and ADC usage:
  * https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/adc.html
  */
