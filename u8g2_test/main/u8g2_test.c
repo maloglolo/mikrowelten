@@ -14,6 +14,7 @@ void app_main(void) {
 
     while (1) {
         buttons_process(adc_handle);
+        display_stats();
         display_update_contrast(rotary_get_contrast());
         vTaskDelay(pdMS_TO_TICKS(20));
     }

@@ -1,7 +1,24 @@
 // u8g2_esp32_hal_spi_only.c
+// ------------------------
+// SPI-only HAL for U8g2 on ESP32.
+// Provides a bridge between the hardware-independent U8g2 library
+// and ESP32 SPI/GPIO interfaces.
+// Heavily inspired by https://github.com/nkolban/esp32-snippets/tree/master/hardware/displays/U8G2
 //
-// HAL (Hardware Abstraction Layer) implementation for U8g2 library on ESP32,
-// using SPI (VSPI bus). Provides the glue code between U8g2 and ESP-IDF SPI driver.
+// Resources:
+//  - U8g2 library: https://github.com/olikraus/u8g2
+//  - ESP32 SPI API: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/spi_master.html
+//  - Hardware Abstraction Layer concept: https://en.wikipedia.org/wiki/Hardware_abstraction_layer
+//
+// TODO: Refactor ESP32 U8g2 HAL
+// - HAL struct: add I2C pins, optional flags, group pins logically.
+// - Init: move SPI/I2C setup out of callbacks, validate pins, use bitmask for GPIOs.
+// - Callbacks: minimal logic, use HAL struct, handle optional pins, separate GPIO/delay.
+// - Extensibility: support multiple devices, new protocols, optional custom byte/delay funcs.
+// - Docs: add inline explanations, usage example, link ESP32 SPI/I2C & U8g2.
+//
+// Notes: HAL decouples library from hardware; struct-based config; callbacks implement board-specific behavior; separation of concerns; scalable GPIO init.
+//
 
 #include "u8g2_esp32_hal.h"
 #include "driver/gpio.h"

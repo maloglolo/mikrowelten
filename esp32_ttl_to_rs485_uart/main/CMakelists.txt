@@ -1,2 +1,5 @@
-idf_component_register(SRCS "master.c" "receiver.c" "role_select.h"
-                    INCLUDE_DIRS ".")
+idf_component_register(
+    SRCS "master.c" "receiver.c"
+    INCLUDE_DIRS "."
+    REQUIRES nvs_flash u8g2 u8g2-hal-esp-idf driver freertos lwip esp_wifi esp_system
+)
